@@ -33,4 +33,12 @@
         android:showAsAction="never"
         android:title="@string/show_on_map"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_encrypt"
+        android:title="@string/encrypt"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_decrypt"
+        android:title="@string/decrypt"
+        app:showAsAction="never" />
 </menu>

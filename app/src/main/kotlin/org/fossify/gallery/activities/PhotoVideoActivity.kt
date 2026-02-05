@@ -133,6 +133,11 @@ open class PhotoVideoActivity : BaseViewerActivity(), ViewPagerFragment.Fragment
             findItem(R.id.menu_properties).isVisible = mUri?.scheme == "file" && visibleBottomActions and BOTTOM_ACTION_PROPERTIES == 0
             findItem(R.id.menu_share).isVisible = visibleBottomActions and BOTTOM_ACTION_SHARE == 0
             findItem(R.id.menu_show_on_map).isVisible = visibleBottomActions and BOTTOM_ACTION_SHOW_ON_MAP == 0
+
+            val helper = org.fossify.gallery.helpers.ObfuscationHelper(this@PhotoVideoActivity)
+            val isObfuscated = if (mUri?.path != null) helper.isObfuscatedFile(mUri!!.path!!) else false
+            findItem(R.id.menu_encrypt).isVisible = !isObfuscated && mUri?.scheme == "file" && helper.getObfuscationMap().isNotEmpty()
+            findItem(R.id.menu_decrypt).isVisible = isObfuscated && mUri?.scheme == "file"
         }
     }
 
@@ -156,6 +161,8 @@ open class PhotoVideoActivity : BaseViewerActivity(), ViewPagerFragment.Fragment
                 R.id.menu_edit -> openEditor(mUri!!.toString())
                 R.id.menu_properties -> showProperties()
                 R.id.menu_show_on_map -> showFileOnMap(mUri!!.toString())
+                R.id.menu_encrypt -> toggleObfuscation(true)
+                R.id.menu_decrypt -> toggleObfuscation(false)
                 else -> return@setOnMenuItemClickListener false
             }
             return@setOnMenuItemClickListener true
@@ -243,7 +250,11 @@ open class PhotoVideoActivity : BaseViewerActivity(), ViewPagerFragment.Fragment
         val bundle = Bundle()
         val file = File(mUri.toString())
         val intentType = intent.type ?: ""
+        val obfuscationHelper = org.fossify.gallery.helpers.ObfuscationHelper(this)
+        val isObfuscatedMode = obfuscationHelper.isObfuscatedMode()
+
         val type = when {
+            isObfuscatedMode && obfuscationHelper.isObfuscatedFile(file.absolutePath) -> obfuscationHelper.getObfuscatedFileType(file.absolutePath)
             filename.isVideoFast() || intentType.startsWith("video/") -> TYPE_VIDEOS
             filename.isGif() || intentType.equals("image/gif", true) -> TYPE_GIFS
             filename.isRawFast() -> TYPE_RAWS
@@ -439,4 +450,29 @@ open class PhotoVideoActivity : BaseViewerActivity(), ViewPagerFragment.Fragment
     override fun isSlideShowActive() = false
 
     override fun isFullScreen() = mIsFullScreen
+
+    private fun toggleObfuscation(encrypt: Boolean) {
+        val path = mUri?.path ?: return
+        val file = File(path)
+        val helper = org.fossify.gallery.helpers.ObfuscationHelper(this)
+        val extension = file.extension.lowercase(java.util.Locale.ROOT)
+        val newExtension = if (encrypt) {
+            helper.getObfuscatedExtension(extension)
+        } else {
+            helper.getRealExtension(extension)
+        }
+
+        if (newExtension == null) {
+            toast(org.fossify.commons.R.string.unknown_error_occurred)
+            return
+        }
+
+        val newFile = File(file.parent, "${file.nameWithoutExtension}.$newExtension")
+        if (file.renameTo(newFile)) {
+            rescanPaths(arrayListOf(path, newFile.absolutePath))
+            finish()
+        } else {
+            toast(R.string.error_saving_file)
+        }
+    }
 }

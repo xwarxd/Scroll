@@ -310,6 +310,9 @@ class MediaFetcher(val context: Context) {
             else -> File(folder).listFiles()?.toMutableList() ?: return media
         }
 
+        val obfuscationHelper = ObfuscationHelper(context)
+        val isObfuscatedMode = obfuscationHelper.isObfuscatedMode()
+
         for (curFile in files) {
             var file = curFile
             if (shouldStop) {
@@ -317,12 +320,41 @@ class MediaFetcher(val context: Context) {
             }
 
             var path = file.absolutePath
+            val extension = file.extension.lowercase(java.util.Locale.ROOT)
+            
+            // Check obfuscation status first
+            val isObfuscatedFile = obfuscationHelper.isObfuscatedFile(path)
+            
+            // Skip based on mode
+            if (isObfuscatedMode && !isObfuscatedFile) {
+                continue  // In obfuscated mode, skip non-obfuscated files
+            } else if (!isObfuscatedMode && isObfuscatedFile) {
+                continue  // In normal mode, skip obfuscated files
+            }
+            
             var isPortrait = false
-            val isImage = path.isImageFast()
-            val isVideo = if (isImage) false else path.isVideoFast()
-            val isGif = if (isImage || isVideo) false else path.isGif()
-            val isRaw = if (isImage || isVideo || isGif) false else path.isRawFast()
-            val isSvg = if (isImage || isVideo || isGif || isRaw) false else path.isSvg()
+            var isImage = false
+            var isVideo = false
+            var isGif = false
+            var isRaw = false
+            var isSvg = false
+            
+            // Determine type based on whether file is obfuscated
+            if (isObfuscatedFile) {
+                val realType = obfuscationHelper.getObfuscatedFileType(path)
+                isImage = realType == TYPE_IMAGES
+                isVideo = realType == TYPE_VIDEOS
+                isGif = realType == TYPE_GIFS
+                isRaw = realType == TYPE_RAWS
+                isSvg = realType == TYPE_SVGS
+                isPortrait = realType == TYPE_PORTRAITS
+            } else {
+                isImage = path.isImageFast()
+                isVideo = if (isImage) false else path.isVideoFast()
+                isGif = if (isImage || isVideo) false else path.isGif()
+                isRaw = if (isImage || isVideo || isGif) false else path.isRawFast()
+                isSvg = if (isImage || isVideo || isGif || isRaw) false else path.isSvg()
+            }
 
             if (!isImage && !isVideo && !isGif && !isRaw && !isSvg) {
                 if (showPortraits && file.name.startsWith("img_", true) && file.isDirectory) {
@@ -434,6 +466,9 @@ class MediaFetcher(val context: Context) {
         dateTakens: HashMap<String, Long>
     ): HashMap<String, ArrayList<Medium>> {
         val media = HashMap<String, ArrayList<Medium>>()
+        val obfuscationHelper = ObfuscationHelper(context)
+        val isObfuscatedMode = obfuscationHelper.isObfuscatedMode()
+
         if (!isRPlus() || Environment.isExternalStorageManager()) {
             return media
         }
@@ -466,12 +501,39 @@ class MediaFetcher(val context: Context) {
                     return@queryCursor
                 }
 
-                val isPortrait = false
-                val isImage = path.isImageFast()
-                val isVideo = if (isImage) false else path.isVideoFast()
-                val isGif = if (isImage || isVideo) false else path.isGif()
-                val isRaw = if (isImage || isVideo || isGif) false else path.isRawFast()
-                val isSvg = if (isImage || isVideo || isGif || isRaw) false else path.isSvg()
+                // Check obfuscation status first
+                val isObfuscatedFile = obfuscationHelper.isObfuscatedFile(path)
+                
+                // Skip based on mode
+                if (isObfuscatedMode && !isObfuscatedFile) {
+                    return@queryCursor  // In obfuscated mode, skip non-obfuscated files
+                } else if (!isObfuscatedMode && isObfuscatedFile) {
+                    return@queryCursor  // In normal mode, skip obfuscated files
+                }
+
+                var isPortrait = false
+                var isImage = false
+                var isVideo = false
+                var isGif = false
+                var isRaw = false
+                var isSvg = false
+                
+                // Determine type based on whether file is obfuscated
+                if (isObfuscatedFile) {
+                    val realType = obfuscationHelper.getObfuscatedFileType(path)
+                    isImage = realType == TYPE_IMAGES
+                    isVideo = realType == TYPE_VIDEOS
+                    isGif = realType == TYPE_GIFS
+                    isRaw = realType == TYPE_RAWS
+                    isSvg = realType == TYPE_SVGS
+                    isPortrait = realType == TYPE_PORTRAITS
+                } else {
+                    isImage = path.isImageFast()
+                    isVideo = if (isImage) false else path.isVideoFast()
+                    isGif = if (isImage || isVideo) false else path.isGif()
+                    isRaw = if (isImage || isVideo || isGif) false else path.isRawFast()
+                    isSvg = if (isImage || isVideo || isGif || isRaw) false else path.isSvg()
+                }
 
                 if (!isImage && !isVideo && !isGif && !isRaw && !isSvg) {
                     return@queryCursor
@@ -547,6 +609,8 @@ class MediaFetcher(val context: Context) {
         val checkFileExistence = context.config.fileLoadingPriority == PRIORITY_VALIDITY
         val showHidden = context.config.shouldShowHidden
         val OTGPath = context.config.OTGPath
+        val obfuscationHelper = ObfuscationHelper(context)
+        val isObfuscatedMode = obfuscationHelper.isObfuscatedMode()
 
         for (file in files) {
             if (shouldStop) {
@@ -554,11 +618,38 @@ class MediaFetcher(val context: Context) {
             }
 
             val filename = file.name ?: continue
-            val isImage = filename.isImageFast()
-            val isVideo = if (isImage) false else filename.isVideoFast()
-            val isGif = if (isImage || isVideo) false else filename.isGif()
-            val isRaw = if (isImage || isVideo || isGif) false else filename.isRawFast()
-            val isSvg = if (isImage || isVideo || isGif || isRaw) false else filename.isSvg()
+            
+            // Check obfuscation status first
+            val isObfuscatedFile = obfuscationHelper.isObfuscatedFile(filename)
+            
+            // Skip based on mode
+            if (isObfuscatedMode && !isObfuscatedFile) {
+                continue  // In obfuscated mode, skip non-obfuscated files
+            } else if (!isObfuscatedMode && isObfuscatedFile) {
+                continue  // In normal mode, skip obfuscated files
+            }
+            
+            var isImage = false
+            var isVideo = false
+            var isGif = false
+            var isRaw = false
+            var isSvg = false
+            
+            // Determine type based on whether file is obfuscated
+            if (isObfuscatedFile) {
+                val realType = obfuscationHelper.getObfuscatedFileType(filename)
+                isImage = realType == TYPE_IMAGES
+                isVideo = realType == TYPE_VIDEOS
+                isGif = realType == TYPE_GIFS
+                isRaw = realType == TYPE_RAWS
+                isSvg = realType == TYPE_SVGS
+            } else {
+                isImage = filename.isImageFast()
+                isVideo = if (isImage) false else filename.isVideoFast()
+                isGif = if (isImage || isVideo) false else filename.isGif()
+                isRaw = if (isImage || isVideo || isGif) false else filename.isRawFast()
+                isSvg = if (isImage || isVideo || isGif || isRaw) false else filename.isSvg()
+            }
 
             if (!isImage && !isVideo && !isGif && !isRaw && !isSvg)
                 continue

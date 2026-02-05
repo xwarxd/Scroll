@@ -144,6 +144,8 @@ const val MIN_SKIP_LENGTH = 2000
 const val HIDE_SYSTEM_UI_DELAY = 500L
 const val MAX_PRINT_SIDE_SIZE = 4096
 const val FAST_FORWARD_VIDEO_MS = 10000
+const val IS_OBFUSCATED_MODE = "is_obfuscated_mode"
+const val OBFUSCATION_MAP = "obfuscation_map"
 
 const val EXOPLAYER_MIN_BUFFER_MS = 2000
 const val EXOPLAYER_MAX_BUFFER_MS = 8000

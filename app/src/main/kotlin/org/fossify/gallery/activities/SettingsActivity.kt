@@ -110,6 +110,7 @@ class SettingsActivity : SimpleActivity() {
         setupImportFavorites()
         setupExportSettings()
         setupImportSettings()
+        setupObfuscation()
 
         arrayOf(
             binding.settingsColorCustomizationSectionLabel,
@@ -124,6 +125,7 @@ class SettingsActivity : SimpleActivity() {
             binding.settingsFileOperationsLabel,
             binding.settingsBottomActionsLabel,
             binding.settingsRecycleBinLabel,
+            binding.settingsObfuscationLabel,
             binding.settingsMigratingLabel
         ).forEach {
             it.setTextColor(getProperPrimaryColor())
@@ -1133,6 +1135,8 @@ class SettingsActivity : SimpleActivity() {
                 THUMBNAIL_SPACING -> config.thumbnailSpacing = value.toInt()
                 FILE_ROUNDED_CORNERS -> config.fileRoundedCorners = value.toBoolean()
                 SEARCH_ALL_FILES_BY_DEFAULT -> config.searchAllFilesByDefault = value.toBoolean()
+                IS_OBFUSCATED_MODE -> config.isObfuscatedMode = value.toBoolean()
+                OBFUSCATION_MAP -> config.obfuscationMap = value.toString()
                 ALBUM_COVERS -> {
                     val existingCovers = config.parseAlbumCovers()
                     val existingCoverPaths = existingCovers.map { it.path }.toMutableList() as ArrayList<String>
@@ -1151,6 +1155,20 @@ class SettingsActivity : SimpleActivity() {
         toast(if (configValues.size > 0) org.fossify.commons.R.string.settings_imported_successfully else org.fossify.commons.R.string.no_entries_for_importing)
         runOnUiThread {
             setupSettingItems()
+        }
+    }
+
+
+    private fun setupObfuscation() {
+        binding.settingsObfuscatedMode.isChecked = config.isObfuscatedMode
+        binding.settingsObfuscatedModeHolder.setOnClickListener {
+            binding.settingsObfuscatedMode.toggle()
+            config.isObfuscatedMode = binding.settingsObfuscatedMode.isChecked
+            sendBroadcast(Intent("org.fossify.REFRESH_MEDIA"))
+        }
+
+        binding.settingsManageObfuscationHolder.setOnClickListener {
+            startActivity(Intent(this, ObfuscationActivity::class.java))
         }
     }
 }

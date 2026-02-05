@@ -1560,11 +1560,13 @@ class MainActivity : SimpleActivity(), DirectoryOperationsListener {
                     File(it.path).list()?.asList()
                 }
 
-                val hasMediaFile = children?.any {
-                    it != null && (
-                            it.isMediaFile()
-                                    || (it.startsWith("img_", true)
-                                    && File(it).isDirectory)
+                val obfuscationHelper = org.fossify.gallery.helpers.ObfuscationHelper(this)
+                val hasMediaFile = children?.any { childName ->
+                    childName != null && (
+                            childName.isMediaFile()
+                                    || obfuscationHelper.isObfuscatedFile(childName)
+                                    || (childName.startsWith("img_", true)
+                                    && File(it.path, childName).isDirectory)
                             )
                 } == true
 

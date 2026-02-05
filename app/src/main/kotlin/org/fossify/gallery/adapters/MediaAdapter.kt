@@ -201,6 +201,7 @@ class MediaAdapter(
 
             checkHideBtnVisibility(this, selectedItems)
             checkFavoriteBtnVisibility(this, selectedItems)
+            checkEncryptDecryptBtnVisibility(this, selectedItems)
         }
     }
 
@@ -232,6 +233,8 @@ class MediaAdapter(
             R.id.cab_set_as -> setAs()
             R.id.cab_resize -> resize()
             R.id.cab_delete -> checkDeleteConfirmation()
+            R.id.cab_encrypt -> toggleObfuscation(true)
+            R.id.cab_decrypt -> toggleObfuscation(false)
         }
     }
 
@@ -282,6 +285,68 @@ class MediaAdapter(
         } else {
             val paths = getSelectedPaths()
             PropertiesDialog(activity, paths, config.shouldShowHidden)
+        }
+    }
+
+    private fun checkEncryptDecryptBtnVisibility(menu: Menu, selectedItems: ArrayList<Medium>) {
+        val helper = org.fossify.gallery.helpers.ObfuscationHelper(activity)
+        val selectedPaths = selectedItems.map { it.path }
+        val areAllObfuscated = selectedPaths.all { helper.isObfuscatedFile(it) }
+        val areAllNotObfuscated = selectedPaths.none { helper.isObfuscatedFile(it) }
+        
+        menu.findItem(R.id.cab_encrypt).isVisible = areAllNotObfuscated
+        menu.findItem(R.id.cab_decrypt).isVisible = areAllObfuscated
+    }
+
+    private fun toggleObfuscation(encrypt: Boolean) {
+        val helper = org.fossify.gallery.helpers.ObfuscationHelper(activity)
+        val items = getSelectedItems()
+        val pathsToRescan = ArrayList<String>()
+        var successCount = 0
+
+        ensureBackgroundThread {
+            if (encrypt && helper.getObfuscationMap().isEmpty()) {
+                val newMap = helper.generateRandomMap()
+                helper.saveObfuscationMap(newMap)
+            }
+
+            for (item in items) {
+                val file = java.io.File(item.path)
+                val extension = file.extension.lowercase(java.util.Locale.ROOT)
+                val newExtension = if (encrypt) {
+                    helper.getObfuscatedExtension(extension)
+                } else {
+                    helper.getRealExtension(extension)
+                }
+
+                if (newExtension != null) {
+                    val newFile = java.io.File(file.parent, "${file.nameWithoutExtension}.$newExtension")
+                    if (file.renameTo(newFile)) {
+                        pathsToRescan.add(item.path)
+                        pathsToRescan.add(newFile.absolutePath)
+                        successCount++
+                        
+                        // Update the model in memory so UI can refresh or just let rescan handle it
+                        // Ideally we wait for rescan, but for now we just track paths
+                    }
+                }
+            }
+
+            if (pathsToRescan.isNotEmpty()) {
+                activity.rescanPaths(pathsToRescan) {
+                    activity.runOnUiThread {
+                        listener?.refreshItems()
+                        finishActMode()
+                        if (successCount < items.size) {
+                            activity.toast(org.fossify.commons.R.string.unknown_error_occurred)
+                        }
+                    }
+                }
+            } else {
+                activity.runOnUiThread {
+                     activity.toast(org.fossify.commons.R.string.unknown_error_occurred)
+                }
+            }
         }
     }
 

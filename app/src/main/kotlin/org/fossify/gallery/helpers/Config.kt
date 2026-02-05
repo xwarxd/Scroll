@@ -602,4 +602,12 @@ class Config(context: Context) : BaseConfig(context) {
     var showPermissionRationale: Boolean
         get() = prefs.getBoolean(SHOW_PERMISSION_RATIONALE, false)
         set(showPermissionRationale) = prefs.edit().putBoolean(SHOW_PERMISSION_RATIONALE, showPermissionRationale).apply()
+
+    var isObfuscatedMode: Boolean
+        get() = prefs.getBoolean(IS_OBFUSCATED_MODE, false)
+        set(isObfuscatedMode) = prefs.edit().putBoolean(IS_OBFUSCATED_MODE, isObfuscatedMode).apply()
+
+    var obfuscationMap: String
+        get() = prefs.getString(OBFUSCATION_MAP, "")!!
+        set(obfuscationMap) = prefs.edit().putString(OBFUSCATION_MAP, obfuscationMap).apply()
 }

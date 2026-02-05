@@ -191,6 +191,7 @@ class DirectoryAdapter(
 
             checkHideBtnVisibility(this, selectedPaths)
             checkPinBtnVisibility(this, selectedPaths)
+            checkEncryptDecryptBtnVisibility(this, selectedPaths)
         }
     }
 
@@ -221,6 +222,8 @@ class DirectoryAdapter(
             R.id.cab_delete -> askConfirmDelete()
             R.id.cab_select_photo -> tryChangeAlbumCover(false)
             R.id.cab_use_default -> tryChangeAlbumCover(true)
+            R.id.cab_encrypt -> toggleObfuscation(true)
+            R.id.cab_decrypt -> toggleObfuscation(false)
         }
     }
 
@@ -342,6 +345,65 @@ class DirectoryAdapter(
             val paths = getSelectedPaths().filter { !activity.isAStorageRootFolder(it) && !config.isFolderProtected(it) } as ArrayList<String>
             RenameItemsDialog(activity, paths) {
                 listener?.refreshItems()
+            }
+        }
+    }
+
+    private fun checkEncryptDecryptBtnVisibility(menu: Menu, selectedPaths: ArrayList<String>) {
+        val helper = org.fossify.gallery.helpers.ObfuscationHelper(activity)
+        val isValidSelection = selectedPaths.none { it == FAVORITES || it == RECYCLE_BIN }
+        
+        menu.findItem(R.id.cab_encrypt).isVisible = isValidSelection
+        menu.findItem(R.id.cab_decrypt).isVisible = isValidSelection
+    }
+
+    private fun toggleObfuscation(encrypt: Boolean) {
+        val helper = org.fossify.gallery.helpers.ObfuscationHelper(activity)
+        val selectedPaths = getSelectedPaths().filter { it != FAVORITES && it != RECYCLE_BIN }
+        var successCount = 0
+        val pathsToRescan = ArrayList<String>()
+
+        ensureBackgroundThread {
+            if (encrypt && helper.getObfuscationMap().isEmpty()) {
+                val newMap = helper.generateRandomMap()
+                helper.saveObfuscationMap(newMap)
+            }
+
+            for (path in selectedPaths) {
+                val folder = File(path)
+                if (folder.exists() && folder.isDirectory) {
+                    folder.listFiles()?.forEach { file ->
+                        if (file.isFile) {
+                            val extension = file.extension.lowercase(java.util.Locale.ROOT)
+                            val newExtension = if (encrypt) {
+                                helper.getObfuscatedExtension(extension)
+                            } else {
+                                helper.getRealExtension(extension)
+                            }
+
+                            if (newExtension != null) {
+                                val newFile = File(file.parent, "${file.nameWithoutExtension}.$newExtension")
+                                if (file.renameTo(newFile)) {
+                                    successCount++
+                                }
+                            }
+                        }
+                    }
+                    pathsToRescan.add(path)
+                }
+            }
+            
+            if (pathsToRescan.isNotEmpty()) {
+                activity.rescanPaths(pathsToRescan) {
+                     activity.runOnUiThread {
+                        listener?.refreshItems()
+                        finishActMode()
+                     }
+                }
+            } else {
+                activity.runOnUiThread {
+                    finishActMode()
+                }
             }
         }
     }
