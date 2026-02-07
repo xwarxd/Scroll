@@ -223,10 +223,20 @@ open class PhotoVideoActivity : BaseViewerActivity(), ViewPagerFragment.Fragment
 
         if (mUri!!.scheme == "file") {
             if (filename.contains('.')) {
-                binding.bottomActions.root.beGone()
-                rescanPaths(arrayListOf(mUri!!.path!!))
-                sendViewPagerIntent(mUri!!.path!!)
-                finish()
+                val obfuscationHelper = org.fossify.gallery.helpers.ObfuscationHelper(this)
+                val realPath = mUri!!.path!!
+                
+                // Check if file is obfuscated and determine real type before redirecting
+                if (obfuscationHelper.isObfuscatedFile(realPath)) {
+                    // For obfuscated files, continue to normal handling to avoid type mismatch
+                    // Don't redirect to ViewPager as it might not handle obfuscated files correctly
+                } else if (isFileTypeVisible(realPath)) {
+                    binding.bottomActions.root.beGone()
+                    rescanPaths(arrayListOf(mUri!!.path!!))
+                    sendViewPagerIntent(mUri!!.path!!)
+                    finish()
+                    return
+                }
             }
             return
         } else {

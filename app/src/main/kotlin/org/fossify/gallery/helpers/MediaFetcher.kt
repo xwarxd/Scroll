@@ -127,6 +127,13 @@ class MediaFetcher(val context: Context) {
                 folderNoMediaStatuses["$folder/$NOMEDIA"] = true
             }
 
+            // In obfuscated mode, also scan filesystem for folders with obfuscated files
+            val obfuscationHelper = ObfuscationHelper(context)
+            if (obfuscationHelper.isObfuscatedMode() && obfuscationHelper.getObfuscationMap().isNotEmpty()) {
+                val obfuscatedFolders = scanForObfuscatedFolders(obfuscationHelper, includedPaths, shouldShowHidden)
+                folders.addAll(obfuscatedFolders)
+            }
+
             distinctPaths.filter {
                 it.shouldFolderBeVisible(excludedPaths, includedPaths, shouldShowHidden, folderNoMediaStatuses) { path, hasNoMedia ->
                     folderNoMediaStatuses[path] = hasNoMedia
@@ -134,6 +141,79 @@ class MediaFetcher(val context: Context) {
             }.toMutableList() as ArrayList<String>
         } catch (e: Exception) {
             ArrayList()
+        }
+    }
+
+    private fun scanForObfuscatedFolders(
+        obfuscationHelper: ObfuscationHelper,
+        includedPaths: Set<String>,
+        shouldShowHidden: Boolean
+    ): LinkedHashSet<String> {
+        val obfuscatedFolders = LinkedHashSet<String>()
+        val obfuscationMap = obfuscationHelper.getObfuscationMap()
+        val obfuscatedExtensions = obfuscationMap.values.toSet()
+        
+        // Get common storage paths to scan
+        val pathsToScan = mutableSetOf<String>().apply {
+            add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).toString())
+            add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString())
+            add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString())
+            add(Environment.getExternalStorageDirectory().toString())
+            addAll(includedPaths)
+        }
+
+        for (rootPath in pathsToScan) {
+            try {
+                val rootDir = File(rootPath)
+                if (!rootDir.exists() || !rootDir.isDirectory) continue
+
+                // Recursively scan directories (limited depth to avoid performance issues)
+                scanDirectory(rootDir, obfuscatedExtensions, obfuscatedFolders, shouldShowHidden, 0, 4)
+            } catch (e: Exception) {
+                // Continue with other paths if one fails
+            }
+        }
+
+        return obfuscatedFolders
+    }
+
+    private fun scanDirectory(
+        dir: File,
+        obfuscatedExtensions: Set<String>,
+        foundFolders: LinkedHashSet<String>,
+        shouldShowHidden: Boolean,
+        currentDepth: Int,
+        maxDepth: Int
+    ) {
+        if (currentDepth > maxDepth) return
+        if (!shouldShowHidden && dir.name.startsWith('.')) return
+
+        try {
+            val files = dir.listFiles() ?: return
+            var hasObfuscatedFiles = false
+
+            for (file in files) {
+                if (file.isFile) {
+                    val extension = file.extension.lowercase(java.util.Locale.ROOT)
+                    if (obfuscatedExtensions.contains(extension)) {
+                        hasObfuscatedFiles = true
+                        break
+                    }
+                }
+            }
+
+            if (hasObfuscatedFiles) {
+                foundFolders.add(dir.absolutePath)
+            }
+
+            // Scan subdirectories
+            for (file in files) {
+                if (file.isDirectory) {
+                    scanDirectory(file, obfuscatedExtensions, foundFolders, shouldShowHidden, currentDepth + 1, maxDepth)
+                }
+            }
+        } catch (e: SecurityException) {
+            // Skip directories we can't access
         }
     }
 
